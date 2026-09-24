@@ -1,6 +1,7 @@
 node_modules/
 reports/
 test-results/
+.qafix/
 .env
 playwright/.cache/
 .DS_Store

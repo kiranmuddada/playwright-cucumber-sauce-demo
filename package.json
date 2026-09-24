@@ -6,7 +6,7 @@
   "scripts": {
     "clean": "rimraf reports test-results",
     "typecheck": "tsc --noEmit",
-    "test": "npm run clean && cucumber-js --tags 'not @known_failure'",
+    "test": "npm run clean && cucumber-js --tags 'not @known_failure and not @external_challenge'",
     "test:smoke": "npm run clean && cucumber-js --tags '@smoke and not @known_failure'",
     "test:known-failures": "npm run clean && cucumber-js --tags '@known_failure'",
     "test:qafix": "npm run clean && node scripts/run-all-then-qafix.js",

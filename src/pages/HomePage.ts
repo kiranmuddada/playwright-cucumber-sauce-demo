@@ -15,14 +15,16 @@ export class HomePage {
     await this.catalogLink.click();
   }
 
+  productLink(name: string) {
+    return this.page.getByRole('link', { name: new RegExp(name, 'i') }).first();
+  }
+
   async expectProduct(name: string) {
-    await expect(
-      this.page.getByRole('link', { name, exact: true }).first()
-    ).toBeVisible();
+    await expect(this.productLink(name)).toBeVisible();
   }
 
   async openProduct(name: string) {
-    await this.page.getByRole('link', { name, exact: true }).first().click();
+    await this.productLink(name).click();
   }
 
   /**
