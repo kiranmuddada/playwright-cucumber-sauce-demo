@@ -7,7 +7,7 @@ export class HomePage {
 
   constructor(private readonly page: Page) {
     this.catalogLink = page.getByRole('link', { name: 'Catalog', exact: true });
-    this.checkoutLink = page.locator('//*[@id="cart"]/a[3]');
+    this.checkoutLink = page.locator('//*[@id="maxcart"]/a[3]');
   }
 
   async open() {

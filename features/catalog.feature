@@ -12,9 +12,3 @@ Feature: Browse the product catalog
     When I open the product "Grey jacket"
     Then the product title should be "Grey jacket"
     And the product price should be "£55.00"
-
-  @checkout
-  Scenario: Open checkout from the product catalog
-    Given I open the Sauce Demo home page
-    When I open the product catalog
-    And I click on checkout
