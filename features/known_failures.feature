@@ -9,6 +9,13 @@ Feature: Deliberately failing examples for failure-analysis training
     When I use the intentionally incorrect catalog locator
     Then the intentionally incorrect product heading should be visible
 
+  @broken_locator
+  Scenario: Open a product from the catalog
+    Given I open the Sauce Demo home page
+    When I open the product catalog
+    And I open "Grey jacket" using the product card locator
+    Then the product title should be "Grey jacket"
+
   @application_failure
   Scenario: Demonstrate a missing application item
     Given I open the product catalog directly

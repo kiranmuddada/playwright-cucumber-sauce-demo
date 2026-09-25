@@ -2,9 +2,12 @@ import { expect, Locator, Page } from '@playwright/test';
 
 export class HomePage {
   readonly catalogLink: Locator;
+  readonly checkoutLink: Locator;
+  
 
   constructor(private readonly page: Page) {
     this.catalogLink = page.getByRole('link', { name: 'Catalog', exact: true });
+    this.checkoutLink = page.locator('//*[@id="cart"]/a[3]');
   }
 
   async open() {
@@ -13,6 +16,10 @@ export class HomePage {
 
   async openCatalog() {
     await this.catalogLink.click();
+  }
+
+  async clickCheckout() {
+    await this.checkoutLink.click();
   }
 
   productLink(name: string) {
@@ -25,6 +32,12 @@ export class HomePage {
 
   async openProduct(name: string) {
     await this.productLink(name).click();
+  }
+
+  async openProductUsingBadLocator(name: string) {
+    await this.page
+      .locator(`article[data-product-name="${name}"] a`)
+      .click({ timeout: 5_000 });
   }
 
   /**

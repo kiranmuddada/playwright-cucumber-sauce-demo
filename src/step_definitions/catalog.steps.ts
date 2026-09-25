@@ -19,6 +19,10 @@ When('I open the product catalog', async function (this: CustomWorld) {
   await new HomePage(pageOf(this)).openCatalog();
 });
 
+When('I click on checkout', async function (this: CustomWorld) {
+  await new HomePage(pageOf(this)).clickCheckout();
+});
+
 Given('I open the product catalog directly', async function (this: CustomWorld) {
   await pageOf(this).goto('/collections/all');
 });
@@ -35,6 +39,13 @@ When('I open the product {string}', async function (
   name: string
 ) {
   await new HomePage(pageOf(this)).openProduct(name);
+});
+
+When('I open {string} using the product card locator', async function (
+  this: CustomWorld,
+  name: string
+) {
+  await new HomePage(pageOf(this)).openProductUsingBadLocator(name);
 });
 
 Then('the product title should be {string}', async function (
