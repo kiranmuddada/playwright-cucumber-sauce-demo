@@ -1,10 +1,13 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import { After, Before, Status, setDefaultTimeout } from '@cucumber/cucumber';
 import { chromium, firefox, webkit } from '@playwright/test';
 import { runQafixOnTrace, saveQafixOutput } from './qafix';
 import { CustomWorld } from './world';
 
 setDefaultTimeout(30_000);
+
+const tracingEnabled = process.env.QAFIX_SKIP !== '1';
 
 Before(async function (this: CustomWorld) {
   const name = (process.env.BROWSER || 'chromium').toLowerCase();
@@ -14,28 +17,59 @@ Before(async function (this: CustomWorld) {
     baseURL: process.env.BASE_URL || 'https://sauce-demo.myshopify.com',
     viewport: { width: 1440, height: 900 }
   });
-  await this.context.tracing.start({ screenshots: true, snapshots: true, sources: true });
+  if (tracingEnabled) {
+    await this.context.tracing.start({ screenshots: true, snapshots: true, sources: true });
+  }
   this.page = await this.context.newPage();
 });
 
-After(async function (this: CustomWorld, scenario) {
+After(async function (this: CustomWorld, { gherkinDocument, pickle, result }) {
   if (!this.context || !this.page) return;
-  const failed = scenario.result?.status === Status.FAILED;
-  const safeName = scenario.pickle.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
-  if (failed) {
+  const failed = result?.status === Status.FAILED;
+  const safeName = pickle.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+  if (failed && tracingEnabled) {
     const screenshot = await this.page.screenshot({ fullPage: true });
     await this.attach(screenshot, 'image/png');
     mkdirSync('test-results', { recursive: true });
     const tracePath = `test-results/${safeName}-trace.zip`;
     await this.context.tracing.stop({ path: tracePath });
+    writeIdentitySidecar(tracePath, gherkinDocument, pickle);
     const diagnosis = runQafixOnTrace(tracePath);
     if (diagnosis.trim()) {
       saveQafixOutput(safeName, diagnosis);
       await this.attach(diagnosis, 'text/plain');
     }
-  } else {
+  } else if (tracingEnabled) {
     await this.context.tracing.stop();
   }
   await this.context.close();
   await this.browser?.close();
 });
+
+/**
+ * Cucumber identity cannot be recovered from a Playwright library trace, so
+ * qafix reads `{ feature, line, scenario }` from a sidecar next to the zip.
+ */
+function writeIdentitySidecar(
+  tracePath: string,
+  gherkinDocument: { feature?: { children: readonly { scenario?: { id: string; location: { line: number } } }[] } },
+  pickle: { astNodeIds: readonly string[]; name: string; uri: string }
+): void {
+  const astNodeId = pickle.astNodeIds[0] ?? pickle.astNodeIds.at(-1);
+  const scenario = gherkinDocument.feature?.children
+    .map((child) => child.scenario)
+    .find((candidate) => candidate?.id === astNodeId);
+  if (!scenario) return;
+  writeFileSync(
+    `${tracePath}.qafix.json`,
+    `${JSON.stringify(
+      {
+        feature: path.relative(process.cwd(), path.resolve(pickle.uri)),
+        line: scenario.location.line,
+        scenario: pickle.name
+      },
+      null,
+      2
+    )}\n`
+  );
+}
