@@ -121,6 +121,34 @@ for (const tracePath of traces) {
   }
 }
 
+function traceRank(tracePath) {
+  return /multiple/i.test(path.basename(tracePath)) ? 0 : 1;
+}
+
+function orderLocatorTraces(traces) {
+  const groups = new Map();
+  for (const trace of traces) {
+    const key = trace.target || trace.tracePath;
+    const group = groups.get(key);
+    if (group) group.push(trace);
+    else groups.set(key, [trace]);
+  }
+  const ordered = [];
+  for (const group of groups.values()) {
+    group.sort(
+      (left, right) =>
+        traceRank(left.tracePath) - traceRank(right.tracePath) ||
+        left.tracePath.localeCompare(right.tracePath),
+    );
+    ordered.push(...group);
+  }
+  return ordered;
+}
+
+function isAssertionRefusal(output) {
+  return /qafix fix: refused(?: advancing)? assertion failure/.test(output);
+}
+
 if (locatorTraces.length === 0) {
   console.log("\nNo dispatchable locator-failure traces found.");
   process.exit(0);
@@ -130,7 +158,7 @@ console.log(`\nSelected ${locatorTraces.length} locator trace(s) for healing.`);
 let failed = false;
 const repaired = new Set();
 const blocked = new Set();
-for (const { tracePath, target } of locatorTraces) {
+for (const { tracePath, target } of orderLocatorTraces(locatorTraces)) {
   if (target && repaired.has(target)) {
     console.log(
       `\n=== qafix apply ${tracePath} ===\nSkipped: ${target} was already repaired in this batch. Commit that staged fix before healing another trace for the same file.`,
@@ -158,11 +186,18 @@ for (const { tracePath, target } of locatorTraces) {
     {
       encoding: "utf8",
       cwd: qafixRoot,
-      stdio: "inherit",
+      stdio: ["ignore", "pipe", "pipe"],
     },
   );
-  if (result.status !== 0) failed = true;
-  else if (target) repaired.add(target);
+  const output = `${result.stdout || ""}${result.stderr || ""}`;
+  if (output) process.stdout.write(output.endsWith("\n") ? output : `${output}\n`);
+  if (result.status !== 0) {
+    if (isAssertionRefusal(output)) {
+      console.log(
+        "Skipped: qafix refused an assertion failure after inspecting this trace.",
+      );
+    } else failed = true;
+  } else if (target) repaired.add(target);
 }
 
 process.exit(failed ? 1 : 0);

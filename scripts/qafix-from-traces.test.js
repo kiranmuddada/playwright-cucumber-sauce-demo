@@ -178,3 +178,137 @@ test("skips a heal target that already has uncommitted changes", (t) => {
   );
   assert.equal(existsSync(appliedLog), false);
 });
+
+test("heals a multi-locator trace before another trace for the same file", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "qafix-batch-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+
+  const traces = path.join(root, "traces");
+  mkdirSync(traces, { recursive: true });
+  for (const name of ["css-locator-trace.zip", "heal-multiple-trace.zip"]) {
+    writeFileSync(path.join(traces, name), "fixture");
+  }
+
+  const appliedLog = path.join(root, "applied.jsonl");
+  const fakeBin = path.join(root, "qafix.js");
+  writeFileSync(
+    fakeBin,
+    [
+      "const fs = require('node:fs');",
+      "const trace = process.argv.at(-1);",
+      "if (process.argv.includes('--dry-run')) {",
+      "  console.log('# qafix: repair a failing locator');",
+      "  console.log('- Edit only `pages/CartPage.ts`');",
+      "} else fs.appendFileSync(process.env.QAFIX_APPLIED_LOG, trace + '\\n');",
+      "",
+    ].join("\n"),
+  );
+
+  const output = execFileSync(process.execPath, [script, traces], {
+    encoding: "utf8",
+    cwd: root,
+    env: {
+      ...process.env,
+      QAFIX_BIN: fakeBin,
+      QAFIX_APPLIED_LOG: appliedLog,
+    },
+  });
+
+  assert.match(
+    output,
+    /Skipped: pages\/CartPage.ts was already repaired in this batch/,
+  );
+  assert.deepEqual(
+    readFileSync(appliedLog, "utf8")
+      .trim()
+      .split("\n")
+      .map((trace) => path.basename(trace)),
+    ["heal-multiple-trace.zip"],
+  );
+});
+
+test("skips an apply that refuses an advancing assertion", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "qafix-batch-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+
+  const traces = path.join(root, "traces");
+  mkdirSync(traces, { recursive: true });
+  for (const name of ["assertion-followup-trace.zip", "css-locator-trace.zip"]) {
+    writeFileSync(path.join(traces, name), "fixture");
+  }
+
+  const appliedLog = path.join(root, "applied.jsonl");
+  const fakeBin = path.join(root, "qafix.js");
+  writeFileSync(
+    fakeBin,
+    [
+      "const fs = require('node:fs');",
+      "const trace = process.argv.at(-1);",
+      "if (process.argv.includes('--dry-run')) {",
+      "  console.log('# qafix: repair a failing locator');",
+      "  console.log(trace.includes('assertion') ? '- Edit only `pages/HomePage.ts`' : '- Edit only `pages/CartPage.ts`');",
+      "} else if (trace.includes('assertion')) {",
+      "  console.error('qafix fix: refused advancing assertion failure (assertion-signal)');",
+      "  process.exitCode = 1;",
+      "} else fs.appendFileSync(process.env.QAFIX_APPLIED_LOG, trace + '\\n');",
+      "",
+    ].join("\n"),
+  );
+
+  const result = spawnSync(process.execPath, [script, traces], {
+    encoding: "utf8",
+    cwd: root,
+    env: {
+      ...process.env,
+      QAFIX_BIN: fakeBin,
+      QAFIX_APPLIED_LOG: appliedLog,
+    },
+  });
+
+  assert.equal(result.status, 0);
+  assert.match(
+    result.stdout,
+    /Skipped: qafix refused an assertion failure after inspecting this trace/,
+  );
+  assert.deepEqual(
+    readFileSync(appliedLog, "utf8")
+      .trim()
+      .split("\n")
+      .map((trace) => path.basename(trace)),
+    ["css-locator-trace.zip"],
+  );
+});
+
+test("fails the batch when a locator apply errors", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "qafix-batch-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+
+  const traces = path.join(root, "traces");
+  mkdirSync(traces, { recursive: true });
+  writeFileSync(path.join(traces, "css-locator-trace.zip"), "fixture");
+
+  const fakeBin = path.join(root, "qafix.js");
+  writeFileSync(
+    fakeBin,
+    [
+      "const trace = process.argv.at(-1);",
+      "if (process.argv.includes('--dry-run')) {",
+      "  console.log('# qafix: repair a failing locator');",
+      "  console.log('- Edit only `pages/CartPage.ts`');",
+      "} else {",
+      "  console.error('qafix fix: Cursor timeout: timed out');",
+      "  process.exitCode = 1;",
+      "}",
+      "",
+    ].join("\n"),
+  );
+
+  const result = spawnSync(process.execPath, [script, traces], {
+    encoding: "utf8",
+    cwd: root,
+    env: { ...process.env, QAFIX_BIN: fakeBin },
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /qafix fix: Cursor timeout: timed out/);
+});

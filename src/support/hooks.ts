@@ -10,6 +10,7 @@ setDefaultTimeout(30_000);
 const verificationTracePath = process.env.QAFIX_CAPTURE_TRACE_PATH;
 const tracingEnabled =
   process.env.QAFIX_SKIP !== '1' || verificationTracePath !== undefined;
+const deferQafix = process.env.QAFIX_CAPTURE_ONLY === '1';
 
 Before(async function (this: CustomWorld) {
   const name = (process.env.BROWSER || 'chromium').toLowerCase();
@@ -25,7 +26,7 @@ Before(async function (this: CustomWorld) {
   this.page = await this.context.newPage();
 });
 
-After(async function (this: CustomWorld, { gherkinDocument, pickle, result }) {
+After({ timeout: 600_000 }, async function (this: CustomWorld, { gherkinDocument, pickle, result }) {
   if (!this.context || !this.page) return;
   const failed = result?.status === Status.FAILED;
   const safeName = pickle.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
@@ -39,7 +40,7 @@ After(async function (this: CustomWorld, { gherkinDocument, pickle, result }) {
     mkdirSync(path.dirname(tracePath), { recursive: true });
     await this.context.tracing.stop({ path: tracePath });
     writeIdentitySidecar(tracePath, gherkinDocument, pickle);
-    if (process.env.QAFIX_SKIP !== '1') {
+    if (process.env.QAFIX_SKIP !== '1' && !deferQafix) {
       const diagnosis = runQafixOnTrace(tracePath);
       if (diagnosis.trim()) {
         saveQafixOutput(safeName, diagnosis);
