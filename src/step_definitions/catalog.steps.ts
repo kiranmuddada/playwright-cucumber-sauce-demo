@@ -1,5 +1,6 @@
 import { Given, Then, When } from '@cucumber/cucumber';
 import { expect } from '@playwright/test';
+import { gotoPage } from '../support/navigation';
 import { CustomWorld } from '../support/world';
 import { HomePage } from '../pages/HomePage';
 import { ProductPage } from '../pages/ProductPage';
@@ -24,7 +25,7 @@ When('I click on checkout', async function (this: CustomWorld) {
 });
 
 Given('I open the product catalog directly', async function (this: CustomWorld) {
-  await pageOf(this).goto('/collections/all', { waitUntil: 'domcontentloaded' });
+  await gotoPage(pageOf(this), '/collections/all');
 });
 
 Then('I should see the product {string}', async function (

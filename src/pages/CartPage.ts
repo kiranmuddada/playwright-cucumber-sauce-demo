@@ -1,9 +1,10 @@
 import { expect, Page } from "@playwright/test";
+import { gotoPage } from "../support/navigation";
 
 export class CartPage {
   constructor(private readonly page: Page) {}
   async open() {
-    await this.page.goto("/cart");
+    await gotoPage(this.page, "/cart");
   }
   async expectEmpty() {
     await expect(this.page.getByText(/cart is currently empty/i)).toBeVisible();

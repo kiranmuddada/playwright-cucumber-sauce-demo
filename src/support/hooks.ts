@@ -9,9 +9,16 @@ import {
 } from "@cucumber/cucumber";
 import { chromium, firefox, webkit } from "@playwright/test";
 import { runQafixOnTrace, saveQafixOutput } from "./qafix";
+import { NAVIGATION_ATTEMPTS } from "./navigation";
 import { CustomWorld, type FailedStep } from "./world";
 
-setDefaultTimeout(30_000);
+const actionTimeout = timeoutFromEnv("QAFIX_ACTION_TIMEOUT_MS", 10_000);
+const navigationTimeout = timeoutFromEnv("QAFIX_NAVIGATION_TIMEOUT_MS", 25_000);
+// Every navigation attempt must finish inside the step timeout, so Playwright
+// reports a TimeoutError with a trace instead of Cucumber killing the step.
+setDefaultTimeout(
+  Math.max(30_000, navigationTimeout * NAVIGATION_ATTEMPTS + 10_000),
+);
 
 const verificationTracePath = process.env.QAFIX_CAPTURE_TRACE_PATH;
 const tracingEnabled =
@@ -38,14 +45,8 @@ Before(async function (this: CustomWorld) {
       sources: true,
     });
   }
-  this.context.setDefaultTimeout(
-    timeoutFromEnv("QAFIX_ACTION_TIMEOUT_MS", 10_000),
-  );
-  // Must stay below the 30s Cucumber step timeout so Playwright reports a
-  // TimeoutError with a trace instead of Cucumber killing the step.
-  this.context.setDefaultNavigationTimeout(
-    timeoutFromEnv("QAFIX_NAVIGATION_TIMEOUT_MS", 25_000),
-  );
+  this.context.setDefaultTimeout(actionTimeout);
+  this.context.setDefaultNavigationTimeout(navigationTimeout);
   this.page = await this.context.newPage();
 });
 

@@ -1,4 +1,5 @@
 import { expect, Locator, Page } from '@playwright/test';
+import { gotoPage } from '../support/navigation';
 
 export class HomePage {
   readonly catalogLink: Locator;
@@ -11,7 +12,7 @@ export class HomePage {
   }
 
   async open() {
-    await this.page.goto('/');
+    await gotoPage(this.page, '/');
   }
 
   async openCatalog() {
