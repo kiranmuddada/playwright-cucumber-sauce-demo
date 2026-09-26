@@ -7,13 +7,13 @@ Feature: Deliberately failing examples for failure-analysis training
   Scenario: Demonstrate an incorrect locator
     Given I open the Sauce Demo home page
     When I use the intentionally incorrect catalog locator
-    Then I should see the product "Grey jacket"
+    Then I should see the product "Brown Shades"
 
   @broken_locator
   Scenario: Open a product from the catalog
     Given I open the Sauce Demo home page
     When I open the product catalog
-    And I open "Grey jacket" using the product card locator
+    And I open "Brown Shades" using the product card locator
     Then the product title should be "Grey jacket"
 
   @application_failure
