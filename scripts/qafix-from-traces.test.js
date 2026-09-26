@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = require("node:fs");
+const { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } = require("node:fs");
 const { spawnSync } = require("node:child_process");
 const os = require("node:os");
 const path = require("node:path");
@@ -42,7 +42,7 @@ test("delegates saved traces to qafix heal and reports its summary", (t) => {
   assert.deepEqual(args.slice(0, 2), ["heal", traces]);
   assert.deepEqual(args.slice(2), [
     "--report",
-    path.join(root, "reports", "qafix"),
+    path.join(realpathSync(root), "reports", "qafix"),
   ]);
 });
 
