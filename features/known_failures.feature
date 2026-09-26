@@ -7,7 +7,7 @@ Feature: Deliberately failing examples for failure-analysis training
   Scenario: Demonstrate an incorrect locator
     Given I open the Sauce Demo home page
     When I use the intentionally incorrect catalog locator
-    Then the intentionally incorrect product heading should be visible
+    Then I should see the product "Grey jacket"
 
   @broken_locator
   Scenario: Open a product from the catalog
