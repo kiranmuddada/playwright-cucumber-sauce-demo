@@ -18,6 +18,9 @@ export class CartPage {
       .locator("#missing-continue-shopping")
       .click({ timeout: 5_000 });
   }
+  async clickCartLinkUsingBrokenCssLocator() {
+    await this.page.locator("#missing-cart-link").click({ timeout: 5_000 });
+  }
   async clickContinueShoppingUsingBrokenXPathLocator() {
     await this.page
       .locator('xpath=//a[@data-testid="missing-continue-shopping"]')

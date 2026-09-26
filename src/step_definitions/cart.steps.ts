@@ -25,6 +25,12 @@ When(
   },
 );
 When(
+  "I click the cart link using a broken CSS locator",
+  async function (this: CustomWorld) {
+    await cart(this).clickCartLinkUsingBrokenCssLocator();
+  },
+);
+When(
   "I click continue shopping using a broken XPath locator",
   async function (this: CustomWorld) {
     await cart(this).clickContinueShoppingUsingBrokenXPathLocator();
