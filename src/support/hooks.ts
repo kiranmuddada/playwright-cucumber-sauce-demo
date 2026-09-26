@@ -1,9 +1,15 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { After, Before, Status, setDefaultTimeout } from "@cucumber/cucumber";
+import {
+  After,
+  AfterStep,
+  Before,
+  Status,
+  setDefaultTimeout,
+} from "@cucumber/cucumber";
 import { chromium, firefox, webkit } from "@playwright/test";
 import { runQafixOnTrace, saveQafixOutput } from "./qafix";
-import { CustomWorld } from "./world";
+import { CustomWorld, type FailedStep } from "./world";
 
 setDefaultTimeout(30_000);
 
@@ -13,6 +19,7 @@ const tracingEnabled =
 const deferQafix = process.env.QAFIX_CAPTURE_ONLY === "1";
 
 Before(async function (this: CustomWorld) {
+  this.failedStep = undefined;
   const name = (process.env.BROWSER || "chromium").toLowerCase();
   const browserType =
     name === "firefox" ? firefox : name === "webkit" ? webkit : chromium;
@@ -30,7 +37,17 @@ Before(async function (this: CustomWorld) {
       sources: true,
     });
   }
+  const configured = Number(process.env.QAFIX_ACTION_TIMEOUT_MS ?? 10_000);
+  this.context.setDefaultTimeout(
+    Number.isFinite(configured) && configured > 0 ? configured : 10_000,
+  );
   this.page = await this.context.newPage();
+});
+
+AfterStep(async function (this: CustomWorld, { pickle, pickleStep, gherkinDocument, result }) {
+  if (result.status !== Status.FAILED) return;
+  const recorded = failedStepFromHook(pickle, pickleStep, gherkinDocument);
+  if (recorded) this.failedStep = recorded;
 });
 
 After(
@@ -48,7 +65,7 @@ After(
       }
       mkdirSync(path.dirname(tracePath), { recursive: true });
       await this.context.tracing.stop({ path: tracePath });
-      writeIdentitySidecar(tracePath, gherkinDocument, pickle);
+      writeIdentitySidecar(tracePath, gherkinDocument, pickle, this.failedStep);
       if (process.env.QAFIX_SKIP !== "1" && !deferQafix) {
         const diagnosis = runQafixOnTrace(tracePath);
         if (diagnosis.trim()) {
@@ -78,6 +95,7 @@ function writeIdentitySidecar(
     };
   },
   pickle: { astNodeIds: readonly string[]; name: string; uri: string },
+  failedStep: FailedStep | undefined,
 ): void {
   const astNodeId = pickle.astNodeIds[0] ?? pickle.astNodeIds.at(-1);
   const scenario = gherkinDocument.feature?.children
@@ -91,9 +109,80 @@ function writeIdentitySidecar(
         feature: path.relative(process.cwd(), path.resolve(pickle.uri)),
         line: scenario.location.line,
         scenario: pickle.name,
+        ...(failedStep === undefined ? {} : { step: failedStep }),
       },
       null,
       2,
     )}\n`,
   );
+}
+
+type GherkinStepLike = {
+  id: string;
+  keyword: string;
+  location: { line: number };
+};
+
+/**
+ * Maps the failed pickle step back to its Gherkin keyword and feature line.
+ * Returns undefined when the document has no matching step.
+ */
+function failedStepFromHook(
+  pickle: { steps: readonly { id: string }[] },
+  pickleStep: { id: string; astNodeIds: readonly string[]; text: string },
+  gherkinDocument: {
+    feature?: {
+      children: readonly {
+        background?: { steps: readonly GherkinStepLike[] };
+        scenario?: { steps: readonly GherkinStepLike[] };
+        rule?: {
+          children: readonly {
+            background?: { steps: readonly GherkinStepLike[] };
+            scenario?: { steps: readonly GherkinStepLike[] };
+          }[];
+        };
+      }[];
+    };
+  },
+): FailedStep | undefined {
+  const index = pickle.steps.findIndex((step) => step.id === pickleStep.id);
+  if (index < 0) return undefined;
+  const astNodeId = pickleStep.astNodeIds[0];
+  const gherkinStep = gherkinSteps(gherkinDocument).find(
+    (step) => step.id === astNodeId,
+  );
+  if (!gherkinStep || gherkinStep.location.line < 1) return undefined;
+  return {
+    index,
+    keyword: gherkinStep.keyword.trim(),
+    text: pickleStep.text,
+    line: gherkinStep.location.line,
+  };
+}
+
+function gherkinSteps(gherkinDocument: {
+  feature?: {
+    children: readonly {
+      background?: { steps: readonly GherkinStepLike[] };
+      scenario?: { steps: readonly GherkinStepLike[] };
+      rule?: {
+        children: readonly {
+          background?: { steps: readonly GherkinStepLike[] };
+          scenario?: { steps: readonly GherkinStepLike[] };
+        }[];
+      };
+    }[];
+  };
+}): GherkinStepLike[] {
+  const children = gherkinDocument.feature?.children ?? [];
+  const steps: GherkinStepLike[] = [];
+  for (const child of children) {
+    if (child.background) steps.push(...child.background.steps);
+    if (child.scenario) steps.push(...child.scenario.steps);
+    for (const ruleChild of child.rule?.children ?? []) {
+      if (ruleChild.background) steps.push(...ruleChild.background.steps);
+      if (ruleChild.scenario) steps.push(...ruleChild.scenario.steps);
+    }
+  }
+  return steps;
 }

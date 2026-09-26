@@ -85,7 +85,7 @@ npm run qafix:trace -- test-results
 npm run test:qafix-batch      # test locator-only trace filtering
 ```
 
-The trace batch command scans nested directories, uses `qafix fix --dry-run` to select only dispatchable locator failures, then applies every selected trace sequentially with `qafix fix --batch`, including multiple traces targeting the same file. Batch repairs are verified one scenario at a time, retained unstaged, and do not change existing staged content. If a later repair fails, only that trace's edits are rolled back; earlier verified locator fixes remain. Assertion, unknown, selector-less, and otherwise non-dispatchable traces are reported as skipped. If a scenario advances from a repaired locator to an assertion/application failure, the locator change is retained and the command reports the remaining failure with a nonzero exit.
+The trace batch command runs `qafix heal` on every saved `trace.zip`. Each failed scenario's sidecar includes the failing step. qafix maps that step to the page-object method on the stack and writes `reports/qafix/heal-map.md` plus `heal-map.json`. Locators in the same page object are healed together, one agent edit per file, then each affected scenario is re-run. Assertion and unknown failures are listed in the map and are not edited. If a scenario gets past the repaired locator and then fails on an assertion or unknown error, the locator edit is kept and the map records how far it got. The command exits nonzero while any healed scenario is still failing.
 
 From the **qa-fix** repo you can point at the same file:
 
