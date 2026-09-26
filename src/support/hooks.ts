@@ -16,7 +16,8 @@ setDefaultTimeout(30_000);
 const verificationTracePath = process.env.QAFIX_CAPTURE_TRACE_PATH;
 const tracingEnabled =
   process.env.QAFIX_SKIP !== "1" || verificationTracePath !== undefined;
-const deferQafix = process.env.QAFIX_CAPTURE_ONLY === "1";
+/** Suite runs only save traces; heal them afterwards with `npm run heal`. */
+const inlineQafix = process.env.QAFIX_INLINE === "1";
 
 Before(async function (this: CustomWorld) {
   this.failedStep = undefined;
@@ -70,7 +71,7 @@ After(
       mkdirSync(path.dirname(tracePath), { recursive: true });
       await this.context.tracing.stop({ path: tracePath });
       writeIdentitySidecar(tracePath, gherkinDocument, pickle, this.failedStep);
-      if (process.env.QAFIX_SKIP !== "1" && !deferQafix) {
+      if (process.env.QAFIX_SKIP !== "1" && inlineQafix) {
         const diagnosis = runQafixOnTrace(tracePath);
         if (diagnosis.trim()) {
           saveQafixOutput(safeName, diagnosis);

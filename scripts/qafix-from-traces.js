@@ -21,13 +21,17 @@ if (!existsSync(bin)) {
 }
 
 const qafixRoot = path.resolve(path.dirname(bin), "..", "..");
-const target = path.resolve(process.argv[2] || "test-results");
+const args = process.argv.slice(2);
+const flags = args.filter((arg) => arg.startsWith("-"));
+const target = path.resolve(
+  args.find((arg) => !arg.startsWith("-")) || "test-results",
+);
 const reportDir = path.resolve(process.cwd(), "reports/qafix");
 
 console.log(`\n=== qafix heal ${target} ===\n`);
 const result = spawnSync(
   process.execPath,
-  [bin, "heal", target, "--report", reportDir],
+  [bin, "heal", target, "--report", reportDir, ...flags],
   {
     cwd: qafixRoot,
     stdio: "inherit",

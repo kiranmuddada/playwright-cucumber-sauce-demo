@@ -57,35 +57,48 @@ Environment variables are optional. The framework defaults to the public Sauce D
 npm test                    # normal tests, excludes known failures
 npm run test:smoke          # smoke suite
 npm run test:known-failures # deliberately failing examples
-npm run test:all            # every feature, including known failures
-npm run test:qafix          # full suite, then preflight and heal locator traces
+npm run test:suite          # every feature, including known failures
 npm run typecheck
 ```
+
+Every run saves a trace for each failed scenario. To heal them, see [QA-Fix connection](#qa-fix-connection).
 
 Open `reports/cucumber-report.html` for Cucumber's built-in report. The post-test script also creates the richer report under `reports/html/` when the standard `npm test` command reaches `posttest`.
 
 ## QA-Fix connection
 
-This repo depends on the local [`qa-fix`](../../qaFixAIAgent/qa-fix) CLI (`npm ci`, `npm run build`, `npm link` there, then `npm link qafix` here). After that, a failed scenario:
+This repo depends on the local [`qa-fix`](../../qaFixAIAgent/qa-fix) CLI (`npm ci`, `npm run build`, `npm link` there, then `npm link qafix` here). Running the suite and healing are separate steps. A suite run only saves `test-results/<scenario>-trace.zip` and its `.qafix.json` sidecar for each failed scenario. Healing reads those traces afterwards. `qafix` reads Playwright traces only; Cucumber JSON/HTML reports stay with this project.
 
-1. Writes `test-results/<scenario>-trace.zip` (already enabled in hooks).
-2. Runs `qafix fix` on that zip.
-3. Attaches the diagnosis to the Cucumber report and writes `reports/qafix/<scenario>.txt`.
+Run from this repo's root. No environment variables are needed.
 
-`qafix` reads Playwright traces only. Cucumber JSON/HTML reports stay with this project.
+**Run the suite only (no healing)**
 
 ```bash
-npm ci
-npm run test:qafix            # every scenario, then preflight traces and heal locator failures
+npm run test:suite                                    # every feature
+npm run test:suite -- features/cart.feature           # one feature
+npm run test:suite -- --tags '@known_failure'         # by tag
 
-# preflight all saved traces, then apply only dispatchable locator repairs
-npm run qafix
-npm run qafix:trace -- test-results/demonstrate-an-incorrect-locator-trace.zip
-npm run qafix:trace -- test-results
-npm run test:qafix-batch      # test locator-only trace filtering
+npx qafix test                                        # every feature
+npx qafix test features/cart.feature --name "Heal a stale XPath locator on continue shopping"
 ```
 
-The trace batch command runs `qafix heal` on every saved `trace.zip`. Each failed scenario's sidecar includes the failing step. qafix maps that step to the page-object method on the stack and writes `reports/qafix/heal-map.md` plus `heal-map.json`. Locators in the same page object are healed together, one agent edit per file, then each affected scenario is re-run.
+**Heal the failures from the saved traces**
+
+```bash
+npm run heal                                          # heal test-results, write reports/qafix/heal-map.md
+npm run heal:dry-run                                  # heal map and prompts only, no edits
+npm run heal -- test-results/<scenario>-trace.zip     # one trace
+
+npx qafix heal test-results --report reports/qafix
+npx qafix heal test-results --dry-run
+npx qafix heal test-results/<scenario>-trace.zip
+```
+
+**Both in one command:** `npm run test:qafix` runs every feature, then heals. `npm run test:qafix-batch` tests the heal wrapper script; it does not heal.
+
+Every `npm test` / `npm run test*` script cleans `test-results/` first, so heal before starting another suite run. Set `QAFIX_INLINE=1` to run qafix on each failing scenario during the suite run instead (the old per-scenario diagnosis, written to `reports/qafix/<scenario>.txt`).
+
+`npm run heal` runs `qafix heal` on every saved `trace.zip`. Each failed scenario's sidecar includes the failing step. qafix maps that step to the page-object method on the stack and writes `reports/qafix/heal-map.md` plus `heal-map.json`. Locators in the same page object are healed together, one agent edit per file, then each affected scenario is re-run.
 
 - A locator failure is healed.
 - An assertion or unknown failure is not edited. It is listed under **Bugs** in the heal map with the failing step and error.
@@ -96,16 +109,14 @@ The command exits nonzero while any bug is reported or any locator is unverified
 
 Timeouts: `QAFIX_ACTION_TIMEOUT_MS` (default 10000) caps clicks, fills, and other actions. `QAFIX_NAVIGATION_TIMEOUT_MS` (default 25000) caps `page.goto` and other navigations, and must stay below the 30-second Cucumber step timeout. Pages open with `waitUntil: 'domcontentloaded'`, so a slow third-party script cannot stall navigation. A navigation `TimeoutError` is reported as an unknown failure (`navigation-timeout`), not healed as a locator.
 
-From the **qa-fix** repo you can point at the same file:
+To repair a single trace with the older per-trace flow, from the **qa-fix** repo:
 
 ```bash
 cd "/Users/c8v6gq/Library/CloudStorage/OneDrive-CIGNA/Desktop/Automation_Framewroks/qaFixAIAgent/qa-fix"
-node dist/bin/qafix.js fix "/Users/c8v6gq/Library/CloudStorage/OneDrive-CIGNA/Desktop/Automation_Framewroks/Hackethon/playwright-cucumber-sauce-demo/test-results/<scenario>-trace.zip"
+node dist/bin/qafix.js fix "/Users/c8v6gq/Library/CloudStorage/OneDrive-CIGNA/Desktop/Automation_Framewroks/Hackethon/playwright-cucumber-sauce-demo/test-results/<scenario>-trace.zip" --batch
 ```
 
-Skip diagnosis with `QAFIX_SKIP=1`. Point at another CLI with `QAFIX_BIN=/path/to/qafix.js`.
-
-qafix prints the failing action, selector, and a compact DOM tree. It does not edit step definitions or claim a verified fix.
+`QAFIX_SKIP=1` turns off trace capture, so there is nothing to heal afterwards. Point at another CLI with `QAFIX_BIN=/path/to/qafix.js`.
 
 ## Why the failing tests are separated
 

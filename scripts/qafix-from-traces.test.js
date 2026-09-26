@@ -46,6 +46,28 @@ test("delegates saved traces to qafix heal and reports its summary", (t) => {
   ]);
 });
 
+test("forwards --dry-run and defaults the target to test-results", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "qafix-batch-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const bin = fakeBin(root, "console.log(JSON.stringify(process.argv.slice(2)));\n");
+
+  const result = spawnSync(process.execPath, [script, "--dry-run"], {
+    encoding: "utf8",
+    cwd: root,
+    env: { ...process.env, QAFIX_BIN: bin },
+  });
+
+  assert.equal(result.status, 0);
+  const args = JSON.parse(result.stdout.trim().split("\n").at(-1));
+  assert.deepEqual(args, [
+    "heal",
+    path.join(realpathSync(root), "test-results"),
+    "--report",
+    path.join(realpathSync(root), "reports", "qafix"),
+    "--dry-run",
+  ]);
+});
+
 test("exits nonzero when heal retains assertion or unknown failures", (t) => {
   const root = mkdtempSync(path.join(os.tmpdir(), "qafix-batch-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
