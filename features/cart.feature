@@ -8,10 +8,10 @@ Feature: Shopping cart
     And I should see a continue shopping link
 
   @known_failure @qafix_validation @qafix_css
-  Scenario: Heal a stale CSS locator on a cart link
+  Scenario: Heal a stale CSS locator and reach the catalog
     Given I open the cart
-    When I click the cart link using a broken CSS locator
-    Then I should see a continue shopping link
+    When I click continue shopping using a broken CSS locator
+    Then I should see the product "Grey jacket"
 
   @known_failure @qafix_validation @qafix_xpath
   Scenario: Heal a stale XPath locator on continue shopping
@@ -20,8 +20,8 @@ Feature: Shopping cart
     Then I should see the product "Grey jacket"
 
   @known_failure @qafix_validation @qafix_multi_locator
-  Scenario: Heal multiple stale locators in the cart flow
+  Scenario: Heal multiple locators and reach the product page
     Given I open the cart
-    When I click the cart link using a broken CSS locator
-    And I click continue shopping using a broken XPath locator
-    Then I should see the product "Grey jacket"
+    When I click continue shopping using a broken CSS locator
+    And I open the product using a broken XPath locator
+    Then the product title should be "Grey jacket"
