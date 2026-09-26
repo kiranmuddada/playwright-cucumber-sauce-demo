@@ -12,6 +12,7 @@
     "test:qafix": "npm run clean && node scripts/run-all-then-qafix.js",
     "qafix": "node scripts/qafix-from-traces.js",
     "qafix:trace": "node scripts/qafix-from-traces.js",
+    "test:qafix-batch": "node --test scripts/qafix-from-traces.test.js",
     "test:all": "npm run clean && cucumber-js",
     "report": "node scripts/generate-report.js",
     "posttest": "npm run report",
@@ -28,6 +29,8 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.8.0"
   },
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "license": "MIT"
 }

@@ -7,7 +7,9 @@ import { CustomWorld } from './world';
 
 setDefaultTimeout(30_000);
 
-const tracingEnabled = process.env.QAFIX_SKIP !== '1';
+const verificationTracePath = process.env.QAFIX_CAPTURE_TRACE_PATH;
+const tracingEnabled =
+  process.env.QAFIX_SKIP !== '1' || verificationTracePath !== undefined;
 
 Before(async function (this: CustomWorld) {
   const name = (process.env.BROWSER || 'chromium').toLowerCase();
@@ -28,16 +30,21 @@ After(async function (this: CustomWorld, { gherkinDocument, pickle, result }) {
   const failed = result?.status === Status.FAILED;
   const safeName = pickle.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
   if (failed && tracingEnabled) {
-    const screenshot = await this.page.screenshot({ fullPage: true });
-    await this.attach(screenshot, 'image/png');
-    mkdirSync('test-results', { recursive: true });
-    const tracePath = `test-results/${safeName}-trace.zip`;
+    const tracePath =
+      verificationTracePath ?? `test-results/${safeName}-trace.zip`;
+    if (process.env.QAFIX_SKIP !== '1') {
+      const screenshot = await this.page.screenshot({ fullPage: true });
+      await this.attach(screenshot, 'image/png');
+    }
+    mkdirSync(path.dirname(tracePath), { recursive: true });
     await this.context.tracing.stop({ path: tracePath });
     writeIdentitySidecar(tracePath, gherkinDocument, pickle);
-    const diagnosis = runQafixOnTrace(tracePath);
-    if (diagnosis.trim()) {
-      saveQafixOutput(safeName, diagnosis);
-      await this.attach(diagnosis, 'text/plain');
+    if (process.env.QAFIX_SKIP !== '1') {
+      const diagnosis = runQafixOnTrace(tracePath);
+      if (diagnosis.trim()) {
+        saveQafixOutput(safeName, diagnosis);
+        await this.attach(diagnosis, 'text/plain');
+      }
     }
   } else if (tracingEnabled) {
     await this.context.tracing.stop();

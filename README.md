@@ -1,7 +1,6 @@
 # Proposed Architecture
+
 <img width="487" height="687" alt="Screenshot 2026-09-21 at 5 32 06 PM" src="https://github.com/user-attachments/assets/14b772e2-35f8-4d27-b8ae-3b86de975f2f" />
-
-
 
 # Playwright + Cucumber BDD: Sauce Demo
 
@@ -59,7 +58,7 @@ npm test                    # normal tests, excludes known failures
 npm run test:smoke          # smoke suite
 npm run test:known-failures # deliberately failing examples
 npm run test:all            # every feature, including known failures
-npm run test:qafix          # full suite, then qafix 1.1–1.3 on every saved trace.zip
+npm run test:qafix          # full suite, then preflight and heal locator traces
 npm run typecheck
 ```
 
@@ -77,13 +76,16 @@ This repo depends on the local [`qa-fix`](../../qaFixAIAgent/qa-fix) CLI (`npm c
 
 ```bash
 npm ci
-npm run test:qafix            # every scenario, then qafix fix on each saved trace.zip
+npm run test:qafix            # every scenario, then preflight traces and heal locator failures
 
-# diagnose leftover zips without re-testing
+# preflight all saved traces, then apply only dispatchable locator repairs
 npm run qafix
 npm run qafix:trace -- test-results/demonstrate-an-incorrect-locator-trace.zip
 npm run qafix:trace -- test-results
+npm run test:qafix-batch      # test locator-only trace filtering
 ```
+
+The trace batch command scans nested directories, uses `qafix fix --dry-run` to select only dispatchable locator failures, then applies those traces sequentially. Assertion, unknown, selector-less, and otherwise non-dispatchable traces are reported as skipped. qafix will not edit a heal target that already has uncommitted changes, so commit or restore that file before rerunning. A successful repair stages its file; later traces for that same file are skipped until you commit the staged fix.
 
 From the **qa-fix** repo you can point at the same file:
 

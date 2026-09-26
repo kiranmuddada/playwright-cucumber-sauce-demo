@@ -36,7 +36,8 @@ export class HomePage {
 
   async openProductUsingBadLocator(name: string) {
     await this.page
-      .locator(`article[data-product-name="${name}"] a`)
+      .getByRole('link', { name: new RegExp(name, 'i') })
+      .first()
       .click({ timeout: 5_000 });
   }
 

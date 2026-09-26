@@ -9,6 +9,14 @@ export class CartPage {
   async expectContinueShopping() {
     await expect(this.page.getByRole('link', { name: /continue shopping/i })).toBeVisible();
   }
+  async clickCartLinkUsingBrokenCssLocator() {
+    await this.page.locator('#missing-cart-link').click({ timeout: 5_000 });
+  }
+  async clickContinueShoppingUsingBrokenXPathLocator() {
+    await this.page
+      .locator('xpath=//a[@data-testid="missing-continue-shopping"]')
+      .click({ timeout: 5_000 });
+  }
   async expectPopulated() {
     await expect(this.page.getByRole('button', { name: /checkout/i })).toBeVisible();
   }
