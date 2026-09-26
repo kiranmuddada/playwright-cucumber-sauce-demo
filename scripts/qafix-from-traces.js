@@ -22,19 +22,6 @@ function healTargetFromDryRun(output) {
   return output.match(/^- Edit only `([^`]+)`/m)?.[1];
 }
 
-function healTargetIsDirty(relativePath) {
-  const result = spawnSync(
-    "git",
-    ["status", "--porcelain", "--", relativePath],
-    {
-      encoding: "utf8",
-      cwd: process.cwd(),
-    },
-  );
-  if (result.status !== 0) return false;
-  return Boolean((result.stdout || "").trim());
-}
-
 function collectTraces(target) {
   const resolved = path.resolve(target);
   if (!existsSync(resolved)) {
@@ -149,6 +136,12 @@ function isAssertionRefusal(output) {
   return /qafix fix: refused(?: advancing)? assertion failure/.test(output);
 }
 
+function retainedLocatorWithAssertion(output) {
+  return /retained verified locator repair\(s\); scenario still fails on an assertion/u.test(
+    output,
+  );
+}
+
 if (locatorTraces.length === 0) {
   console.log("\nNo dispatchable locator-failure traces found.");
   process.exit(0);
@@ -156,33 +149,13 @@ if (locatorTraces.length === 0) {
 
 console.log(`\nSelected ${locatorTraces.length} locator trace(s) for healing.`);
 let failed = false;
-const repaired = new Set();
-const blocked = new Set();
+let verified = 0;
+let remainingApplicationFailures = 0;
 for (const { tracePath, target } of orderLocatorTraces(locatorTraces)) {
-  if (target && repaired.has(target)) {
-    console.log(
-      `\n=== qafix apply ${tracePath} ===\nSkipped: ${target} was already repaired in this batch. Commit that staged fix before healing another trace for the same file.`,
-    );
-    continue;
-  }
-  if (target && blocked.has(target)) {
-    console.log(
-      `\n=== qafix apply ${tracePath} ===\nSkipped: heal target must be clean before qafix: ${target}`,
-    );
-    continue;
-  }
-  if (target && healTargetIsDirty(target)) {
-    console.log(
-      `\n=== qafix apply ${tracePath} ===\nSkipped: heal target must be clean before qafix: ${target}\nCommit or restore that file, then rerun this command.`,
-    );
-    blocked.add(target);
-    failed = true;
-    continue;
-  }
   console.log(`\n=== qafix apply ${tracePath} ===`);
   const result = spawnSync(
     process.execPath,
-    [bin, "fix", path.resolve(tracePath)],
+    [bin, "fix", "--batch", path.resolve(tracePath)],
     {
       encoding: "utf8",
       cwd: qafixRoot,
@@ -190,14 +163,25 @@ for (const { tracePath, target } of orderLocatorTraces(locatorTraces)) {
     },
   );
   const output = `${result.stdout || ""}${result.stderr || ""}`;
-  if (output) process.stdout.write(output.endsWith("\n") ? output : `${output}\n`);
+  if (output)
+    process.stdout.write(output.endsWith("\n") ? output : `${output}\n`);
   if (result.status !== 0) {
     if (isAssertionRefusal(output)) {
       console.log(
         "Skipped: qafix refused an assertion failure after inspecting this trace.",
       );
+    } else if (retainedLocatorWithAssertion(output)) {
+      remainingApplicationFailures += 1;
+      console.log(
+        `Retained verified locator edits for ${target || tracePath}; the scenario still has an assertion/application failure.`,
+      );
     } else failed = true;
-  } else if (target) repaired.add(target);
+  } else {
+    verified += 1;
+  }
 }
 
-process.exit(failed ? 1 : 0);
+console.log(
+  `\nBatch complete: ${verified} trace(s) fully verified; ${remainingApplicationFailures} trace(s) retained locator fixes but still have assertion/application failures.`,
+);
+process.exit(failed || remainingApplicationFailures > 0 ? 1 : 0);
