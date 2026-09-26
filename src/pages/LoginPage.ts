@@ -2,7 +2,7 @@ import { expect, Page } from '@playwright/test';
 
 export class LoginPage {
   constructor(private readonly page: Page) {}
-  async open() { await this.page.goto('/account/login'); }
+  async open() { await this.page.goto('/account/login', { waitUntil: 'domcontentloaded' }); }
   async login(email: string, password: string) {
     await this.page.getByLabel(/email address/i).fill(email);
     await this.page.getByLabel(/^password$/i).fill(password);

@@ -37,9 +37,13 @@ Before(async function (this: CustomWorld) {
       sources: true,
     });
   }
-  const configured = Number(process.env.QAFIX_ACTION_TIMEOUT_MS ?? 10_000);
   this.context.setDefaultTimeout(
-    Number.isFinite(configured) && configured > 0 ? configured : 10_000,
+    timeoutFromEnv("QAFIX_ACTION_TIMEOUT_MS", 10_000),
+  );
+  // Must stay below the 30s Cucumber step timeout so Playwright reports a
+  // TimeoutError with a trace instead of Cucumber killing the step.
+  this.context.setDefaultNavigationTimeout(
+    timeoutFromEnv("QAFIX_NAVIGATION_TIMEOUT_MS", 25_000),
   );
   this.page = await this.context.newPage();
 });
@@ -115,6 +119,11 @@ function writeIdentitySidecar(
       2,
     )}\n`,
   );
+}
+
+function timeoutFromEnv(name: string, fallback: number): number {
+  const configured = Number(process.env[name] ?? fallback);
+  return Number.isFinite(configured) && configured > 0 ? configured : fallback;
 }
 
 type GherkinStepLike = {

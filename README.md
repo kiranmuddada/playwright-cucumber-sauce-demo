@@ -85,7 +85,16 @@ npm run qafix:trace -- test-results
 npm run test:qafix-batch      # test locator-only trace filtering
 ```
 
-The trace batch command runs `qafix heal` on every saved `trace.zip`. Each failed scenario's sidecar includes the failing step. qafix maps that step to the page-object method on the stack and writes `reports/qafix/heal-map.md` plus `heal-map.json`. Locators in the same page object are healed together, one agent edit per file, then each affected scenario is re-run. Assertion and unknown failures are listed in the map and are not edited. If a scenario gets past the repaired locator and then fails on an assertion or unknown error, the locator edit is kept and the map records how far it got. The command exits nonzero while any healed scenario is still failing.
+The trace batch command runs `qafix heal` on every saved `trace.zip`. Each failed scenario's sidecar includes the failing step. qafix maps that step to the page-object method on the stack and writes `reports/qafix/heal-map.md` plus `heal-map.json`. Locators in the same page object are healed together, one agent edit per file, then each affected scenario is re-run.
+
+- A locator failure is healed.
+- An assertion or unknown failure is not edited. It is listed under **Bugs** in the heal map with the failing step and error.
+- When a scenario has both, the broken locators before the failing assertion are healed. The locator edit is kept once the re-run gets past the healed step, and the later assertion or unknown failure is reported as a bug.
+- If the re-run fails before reaching the healed step (for example, `Given I open the cart` times out), the locator edit cannot be verified. It is reverted, and that failure is reported as a bug.
+
+The command exits nonzero while any bug is reported or any locator is unverified.
+
+Timeouts: `QAFIX_ACTION_TIMEOUT_MS` (default 10000) caps clicks, fills, and other actions. `QAFIX_NAVIGATION_TIMEOUT_MS` (default 25000) caps `page.goto` and other navigations, and must stay below the 30-second Cucumber step timeout. Pages open with `waitUntil: 'domcontentloaded'`, so a slow third-party script cannot stall navigation. A navigation `TimeoutError` is reported as an unknown failure (`navigation-timeout`), not healed as a locator.
 
 From the **qa-fix** repo you can point at the same file:
 

@@ -24,7 +24,7 @@ When('I click on checkout', async function (this: CustomWorld) {
 });
 
 Given('I open the product catalog directly', async function (this: CustomWorld) {
-  await pageOf(this).goto('/collections/all');
+  await pageOf(this).goto('/collections/all', { waitUntil: 'domcontentloaded' });
 });
 
 Then('I should see the product {string}', async function (
