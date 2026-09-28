@@ -1,6 +1,7 @@
 node_modules/
 reports/
 test-results/
+defects-reported/
 .qafix/
 .env
 playwright/.cache/

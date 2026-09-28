@@ -4,7 +4,7 @@
   "private": false,
   "description": "Public starter framework using Playwright, Cucumber BDD, TypeScript, POM, reports, and intentional failure examples.",
   "scripts": {
-    "clean": "rimraf reports test-results",
+    "clean": "rimraf reports test-results defects-reported",
     "typecheck": "tsc --noEmit",
     "test": "npm run clean && cucumber-js --tags 'not @known_failure and not @external_challenge'",
     "test:smoke": "npm run clean && cucumber-js --tags '@smoke and not @known_failure'",

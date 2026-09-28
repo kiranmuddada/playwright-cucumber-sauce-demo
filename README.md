@@ -67,7 +67,12 @@ Open `reports/cucumber-report.html` for Cucumber's built-in report. The post-tes
 
 ## QA-Fix connection
 
-This repo depends on the local [`qa-fix`](../../qaFixAIAgent/qa-fix) CLI (`npm ci`, `npm run build`, `npm link` there, then `npm link qafix` here). Running the suite and healing are separate steps. A suite run only saves `test-results/<scenario>-trace.zip` and its `.qafix.json` sidecar for each failed scenario. Healing reads those traces afterwards. `qafix` reads Playwright traces only; Cucumber JSON/HTML reports stay with this project.
+This repo depends on the local [`qa-fix`](../../qaFixAIAgent/qa-fix) CLI (`npm ci`, `npm run build`, `npm link` there, then `npm link qafix` here). Running the suite and healing are separate steps.
+
+- **This repo** runs the suite and, for each failed scenario, saves `test-results/<scenario-slug>-trace.zip`. The slug is the scenario name lower-cased with every run of non-alphanumeric characters replaced by `-`. The suite also writes `reports/cucumber-report.json` (already set in `cucumber.js`).
+- **qafix** does everything after that. It reads the Cucumber JSON report and writes the `.qafix.json` sidecar next to each trace, recording the scenario and the failed step. It then heals locators, re-runs the affected scenarios, and writes the defect reports.
+
+Keep the trace name and the `json:reports/cucumber-report.json` formatter as they are, because qafix matches traces to scenarios by them.
 
 Run from this repo's root. No environment variables are needed.
 
@@ -94,11 +99,18 @@ npx qafix heal test-results --dry-run
 npx qafix heal test-results/<scenario>-trace.zip
 ```
 
+**Write the JIRA defect reports again from the last heal map**
+
+```bash
+npx qafix defects                                     # reads reports/qafix/heal-map.json
+npx qafix defects --no-agent                          # template wording only
+```
+
 **Both in one command:** `npm run test:qafix` runs every feature, then heals. `npm run test:qafix-batch` tests the heal wrapper script; it does not heal.
 
-Every `npm test` / `npm run test*` script cleans `test-results/` first, so heal before starting another suite run. Set `QAFIX_INLINE=1` to run qafix on each failing scenario during the suite run instead (the old per-scenario diagnosis, written to `reports/qafix/<scenario>.txt`).
+Every `npm test` / `npm run test*` script and `npx qafix test` clean `test-results/` and `defects-reported/` first, so heal before starting another suite run.
 
-`npm run heal` runs `qafix heal` on every saved `trace.zip`. Each failed scenario's sidecar includes the failing step. qafix maps that step to the page-object method on the stack and writes `reports/qafix/heal-map.md` plus `heal-map.json`. Locators in the same page object are healed together, one agent edit per file, then each affected scenario is re-run.
+`npm run heal` runs `qafix heal` on every saved `trace.zip`. qafix first writes each trace's sidecar from `reports/cucumber-report.json`, including the failing step. It maps that step to the page-object method on the stack and writes `reports/qafix/heal-map.md` plus `heal-map.json`. Locators in the same page object are healed together, one agent edit per file, then each affected scenario is re-run.
 
 - A locator failure is healed.
 - An assertion or unknown failure is not edited. It is listed under **Bugs** in the heal map with the failing step and error.
@@ -107,7 +119,9 @@ Every `npm test` / `npm run test*` script cleans `test-results/` first, so heal 
 
 The command exits nonzero while any bug is reported or any locator is unverified.
 
-Timeouts: `QAFIX_ACTION_TIMEOUT_MS` (default 10000) caps clicks, fills, and other actions. `QAFIX_NAVIGATION_TIMEOUT_MS` (default 25000) caps `page.goto` and other navigations, and must stay below the 30-second Cucumber step timeout. Pages open with `waitUntil: 'domcontentloaded'`, so a slow third-party script cannot stall navigation. A navigation `TimeoutError` is reported as an unknown failure (`navigation-timeout`), not healed as a locator.
+After healing, qafix writes one JIRA-ready defect report per bug to `defects-reported/<NN>-<scenario-slug>-step-<N>.md` in this repo. Each report has Summary, Description, Steps to Reproduce, Expected Result, Actual Result, Impacted Scenarios, and Impacted Feature Files. Scenarios that fail at the same step with the same error share one report. A plain assertion failure on a `Then` step is written from a template. Complex defects are server or unknown failures, scenarios that also had locators healed, and failures shared by several scenarios. For those, the Cursor agent rewrites only the Summary and Description, and qafix keeps the template if the agent fails or edits anything else. Pass `--no-defects` to `npm run heal` to skip the reports, or `--no-agent` for template wording only.
+
+Timeouts: `QAFIX_ACTION_TIMEOUT_MS` (default 10000) caps clicks, fills, and other actions. `QAFIX_NAVIGATION_TIMEOUT_MS` (default 25000) caps `page.goto` and other navigations. A timed-out navigation is retried once, and the Cucumber step timeout grows to fit both attempts. Pages open with `waitUntil: 'domcontentloaded'`, so a slow third-party script cannot stall navigation. A navigation `TimeoutError` is reported as an unknown failure (`navigation-timeout`), not healed as a locator.
 
 To repair a single trace with the older per-trace flow, from the **qa-fix** repo:
 
